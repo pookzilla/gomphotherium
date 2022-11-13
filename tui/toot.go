@@ -1,10 +1,7 @@
 package tui
 
 import (
-	"container/list"
 	"fmt"
-	"math"
-	"math/rand"
 
 	// "time"
 	// "context"
@@ -23,116 +20,18 @@ import (
 	"github.com/mrusme/gomphotherium/mast"
 )
 
-func StringPtr(s string) *string {
-	return &s
-}
-
-func DrainLine(wordList list.List, numberOfSpaces int, leftoverSpaces int) string {
-	out := ""
-	spaceList := make([]*string, 0)
-	for e := wordList.Front(); e != nil; e = e.Next() {
-		value, ok := e.Value.(*string)
-		if ok {
-			spaceList = append(spaceList, value)
-		}
-	}
-
-	for i := leftoverSpaces; i > 0; i-- {
-		selection := rand.Intn(numberOfSpaces)
-		*spaceList[selection] += " "
-	}
-
-	for e := wordList.Front(); e != nil; e = e.Next() {
-		value, ok := e.Value.(string)
-		if ok {
-			out += value
-		} else {
-			value, ok := e.Value.(*string)
-			if ok {
-				out += *value
-			}
-		}
-	}
-	return out
-}
-
-func WrapWithIndent(s string, w int, indentString string) string {
-	wordList := list.New()
-
-	spaceCount := 0
-	characterCount := 0
-	characterCountOfCurrentWord := 0
-
-	width := 0
-	out := indentString
-	word := ""
-	for _, r := range s {
-		cw := runewidth.RuneWidth(r)
-		if r == '\n' || r == '\r' {
-			out += DrainLine(*wordList, 0, 0)
-
-			out += word // D
-			out += string('\n')
-			out += indentString
-
-			word = "" // D
-			wordList = list.New()
-			spaceCount = 0
-			characterCount = 0
-			width = 0
-			continue
-		} else if r == ' ' { // D
-			wordList.PushBack(word)
-			wordList.PushBack(StringPtr(" "))
-			spaceCount++
-			characterCount += characterCountOfCurrentWord
-
-			characterCountOfCurrentWord = 0
-
-			word = ""   // D
-			width += cw // D
-			continue
-		} else if width+cw > w {
-			characterCountOfCurrentWord += cw
-
-			leftoverSpace := int(math.Min(float64(w-(characterCount+spaceCount)), float64(width/5)))
-			out += DrainLine(*wordList, spaceCount, leftoverSpace)
-
-			out += "\n"
-			out += indentString
-			spaceCount = 0
-			characterCount = characterCountOfCurrentWord
-			width = characterCountOfCurrentWord
-			wordList = list.New()
-
-			word += string(r) // D
-
-			width += cw
-			continue
-		} else {
-			width += cw
-			word += string(r) // D
-			characterCountOfCurrentWord += cw
-			continue
-		}
-	}
-	out += DrainLine(*wordList, 0, 0)
-	out += word // D
-	return out
-}
-
-func RenderToot(toot *mast.Toot, width int, showImages bool) (string, error) {
+func RenderToot(toot *mast.Toot, width int, showImages bool, justifyText bool) (string, error) {
 	status := &toot.Status
-	return RenderStatus(status, toot, width, showImages, true)
+	return RenderStatus(status, toot, width, showImages, justifyText, false)
 }
 
-func RenderStatus(status *mastodon.Status, toot *mast.Toot, width int, showImages bool, top bool) (string, error) {
+func RenderStatus(status *mastodon.Status, toot *mast.Toot, width int, showImages bool, justifyText bool, isReblog bool) (string, error) {
 	var output string = ""
 	var err error = nil
 
 	var indent string = ""
-	if !top {
-		indent = "    \u2502"
+	if isReblog {
+		indent = "    "
 	}
 
 	createdAt := status.CreatedAt
@@ -157,7 +56,7 @@ func RenderStatus(status *mastodon.Status, toot *mast.Toot, width int, showImage
 			// https://github.com/mattn/go-runewidth/issues/36
 			runewidth.StringWidth(inReplyToOrBoost)
 
-	if top && toot.IsNotification == true {
+	if !isReblog && toot.IsNotification == true {
 		notification := &toot.Notification
 
 		notificationText := ""
@@ -205,7 +104,16 @@ func RenderStatus(status *mastodon.Status, toot *mast.Toot, width int, showImage
 		)
 	}
 
-	if top {
+	if isReblog {
+		output = fmt.Sprintf("%s%s[blue]%s[-] [grey]%s[-][purple]%s[-]\n",
+			output,
+			indent,
+			status.Account.DisplayName,
+			account,
+			// strings.Repeat("X", len(status.Account.DisplayName)),
+			// strings.Repeat("x", len(account)),
+			inReplyToOrBoost)
+	} else {
 		output = fmt.Sprintf("%s%s[blue]%s[-] [grey]%s[-][purple]%s[-][grey]%*d[-]\n",
 			output,
 			indent,
@@ -216,24 +124,15 @@ func RenderStatus(status *mastodon.Status, toot *mast.Toot, width int, showImage
 			inReplyToOrBoost,
 			idPadding,
 			toot.ID)
-	} else {
-		output = fmt.Sprintf("%s%s[blue]%s[-] [grey]%s[-][purple]%s[-]\n",
-			output,
-			indent,
-			status.Account.DisplayName,
-			account,
-			// strings.Repeat("X", len(status.Account.DisplayName)),
-			// strings.Repeat("x", len(account)),
-			inReplyToOrBoost)
 	}
 
-	if top && status.Reblog != nil {
-		reblogOutput, err := RenderStatus(status.Reblog, toot, width, showImages, false)
+	if !isReblog && status.Reblog != nil {
+		reblogOutput, err := RenderStatus(status.Reblog, toot, width, showImages, justifyText, true)
 		if err == nil {
 			output = fmt.Sprintf("%s%s", output, reblogOutput)
 		}
 	} else {
-		var wrappedContent string = WrapWithIndent(html.UnescapeString(strip.StripTags(status.Content)), width-len(indent), indent)
+		var wrappedContent string = WrapWithIndent(html.UnescapeString(strip.StripTags(status.Content)), width-len(indent), indent, justifyText)
 
 		output = fmt.Sprintf("%s%s\n",
 			output,
