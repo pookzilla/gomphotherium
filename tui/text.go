@@ -41,18 +41,24 @@ func DrainLine(wordList list.List, numberOfSpaces int, leftoverSpaces int) strin
 	return out
 }
 
-func WrapWithIndent(s string, w int, indentString string, justifyText bool) string {
+func WrapWithIndent(
+	stringToWrap string, 
+	maximumWidth int, 
+	indentString string, 
+	justifyText bool,
+	) string {
+
 	wordList := list.New()
 
 	spaceCount := 0
-	characterCount := 0
+	committedCharacterCount := 0
 	characterCountOfCurrentWord := 0
 
-	width := 0
+	readWidth := 0
 	out := indentString
 	word := ""
-	for _, r := range s {
-		cw := runewidth.RuneWidth(r)
+	for _, r := range stringToWrap {
+		characterWidth := runewidth.RuneWidth(r)
 		if r == '\n' || r == '\r' {
 			out += DrainLine(*wordList, 0, 0)
 
@@ -63,45 +69,51 @@ func WrapWithIndent(s string, w int, indentString string, justifyText bool) stri
 			word = ""
 			wordList = list.New()
 			spaceCount = 0
-			characterCount = 0
-			width = 0
+			committedCharacterCount = 0
+			readWidth = 0
 			continue
 		} else if r == ' ' {
 			wordList.PushBack(word)
 			wordList.PushBack(StringPtr(" "))
 			spaceCount++
-			characterCount += characterCountOfCurrentWord
+			committedCharacterCount += characterCountOfCurrentWord
 
 			characterCountOfCurrentWord = 0
 
 			word = ""
-			width += cw
+			readWidth += characterWidth
 			continue
-		} else if width+cw > w {
-			characterCountOfCurrentWord += cw
-			
+		} else if readWidth + characterWidth > maximumWidth {
+			characterCountOfCurrentWord += characterWidth
+			// giant word - we need to print part of it
+			if characterCountOfCurrentWord >= maximumWidth {
+				wordList.PushBack(word[:maximumWidth-1])
+				word = word[maximumWidth-1:]
+				characterCountOfCurrentWord = characterWidth
+			}
+
 			leftoverSpace := 0
 			if justifyText {
-				leftoverSpace = int(math.Min(float64(w-(characterCount+spaceCount)), float64(spaceCount*2) /*float64(width/5)*/))
+				leftoverSpace = int(math.Min(float64(maximumWidth-(committedCharacterCount + spaceCount)), float64(spaceCount) * 1.5))
 			}
 			out += DrainLine(*wordList, spaceCount, leftoverSpace)
 
 			out += "\n"
 			out += indentString
 			spaceCount = 0
-			characterCount = characterCountOfCurrentWord
-			width = characterCountOfCurrentWord
+			committedCharacterCount = characterCountOfCurrentWord
+			readWidth = characterCountOfCurrentWord
 			wordList = list.New()
 
 			word += string(r)
 
-			width += cw
+			readWidth += characterWidth
 			continue
 
 		} else {
-			width += cw
+			readWidth += characterWidth
 			word += string(r)
-			characterCountOfCurrentWord += cw
+			characterCountOfCurrentWord += characterWidth
 			continue
 		}
 	}
