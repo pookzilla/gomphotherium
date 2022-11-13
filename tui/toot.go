@@ -1,142 +1,280 @@
 package tui
 
 import (
-  "fmt"
-  // "time"
-  // "context"
+	"container/list"
+	"fmt"
+	"math"
+	"math/rand"
 
-  "github.com/mattn/go-runewidth"
-  "github.com/grokify/html-strip-tags-go"
-  "html"
+	// "time"
+	// "context"
+	// "github.com/mattn/go-mastodon"
 
-  "image/color"
-  "github.com/eliukblau/pixterm/pkg/ansimage"
+	"html"
 
-  // "github.com/mattn/go-mastodon"
-  "github.com/mrusme/gomphotherium/mast"
+	strip "github.com/grokify/html-strip-tags-go"
+	"github.com/mattn/go-runewidth"
+
+	"image/color"
+
+	"github.com/eliukblau/pixterm/pkg/ansimage"
+
+	"github.com/mattn/go-mastodon"
+	"github.com/mrusme/gomphotherium/mast"
 )
 
+func StringPtr(s string) *string {
+	return &s
+}
+
+func DrainLine(wordList list.List, numberOfSpaces int, leftoverSpaces int) string {
+	out := ""
+	spaceList := make([]*string, 0)
+	for e := wordList.Front(); e != nil; e = e.Next() {
+		value, ok := e.Value.(*string)
+		if ok {
+			spaceList = append(spaceList, value)
+		}
+	}
+
+	for i := leftoverSpaces; i > 0; i-- {
+		selection := rand.Intn(numberOfSpaces)
+		*spaceList[selection] += " "
+	}
+
+	for e := wordList.Front(); e != nil; e = e.Next() {
+		value, ok := e.Value.(string)
+		if ok {
+			out += value
+		} else {
+			value, ok := e.Value.(*string)
+			if ok {
+				out += *value
+			}
+		}
+	}
+	return out
+}
+
+func WrapWithIndent(s string, w int, indentString string) string {
+	wordList := list.New()
+
+	spaceCount := 0
+	characterCount := 0
+	characterCountOfCurrentWord := 0
+
+	width := 0
+	out := indentString
+	word := ""
+	for _, r := range s {
+		cw := runewidth.RuneWidth(r)
+		if r == '\n' || r == '\r' {
+			out += DrainLine(*wordList, 0, 0)
+
+			out += word // D
+			out += string('\n')
+			out += indentString
+
+			word = "" // D
+			wordList = list.New()
+			spaceCount = 0
+			characterCount = 0
+			width = 0
+			continue
+		} else if r == ' ' { // D
+			wordList.PushBack(word)
+			wordList.PushBack(StringPtr(" "))
+			spaceCount++
+			characterCount += characterCountOfCurrentWord
+
+			characterCountOfCurrentWord = 0
+
+			word = ""   // D
+			width += cw // D
+			continue
+		} else if width+cw > w {
+			characterCountOfCurrentWord += cw
+
+			leftoverSpace := int(math.Min(float64(w-(characterCount+spaceCount)), float64(width/5)))
+			out += DrainLine(*wordList, spaceCount, leftoverSpace)
+
+			out += "\n"
+			out += indentString
+			spaceCount = 0
+			characterCount = characterCountOfCurrentWord
+			width = characterCountOfCurrentWord
+			wordList = list.New()
+
+			word += string(r) // D
+
+			width += cw
+			continue
+		} else {
+			width += cw
+			word += string(r) // D
+			characterCountOfCurrentWord += cw
+			continue
+		}
+	}
+	out += DrainLine(*wordList, 0, 0)
+	out += word // D
+	return out
+}
+
 func RenderToot(toot *mast.Toot, width int, showImages bool) (string, error) {
-  var output string = ""
-  var err error = nil
+	status := &toot.Status
+	return RenderStatus(status, toot, width, showImages, true)
+}
 
-  status := &toot.Status
+func RenderStatus(status *mastodon.Status, toot *mast.Toot, width int, showImages bool, top bool) (string, error) {
+	var output string = ""
+	var err error = nil
 
-  createdAt := status.CreatedAt
+	var indent string = ""
+	if !top {
+		indent = "    \u2502"
+	}
 
-  account := status.Account.Acct
-  if account == "" {
-    account = status.Account.Username
-  }
+	createdAt := status.CreatedAt
 
-  inReplyTo := ""
-  if status.InReplyToID != nil {
-    inReplyTo = " \xe2\x87\x9f"
-  }
+	account := status.Account.Acct
+	if account == "" {
+		account = status.Account.Username
+	}
 
-  idPadding :=
-    width -
-    len(fmt.Sprint(toot.ID)) -
-    runewidth.StringWidth(status.Account.DisplayName) -
-    len(account) -
-    // https://github.com/mattn/go-runewidth/issues/36
-    runewidth.StringWidth(inReplyTo)
+	inReplyToOrBoost := ""
+	if status.InReplyToID != nil {
+		inReplyToOrBoost = " \xe2\x87\x9f"
+	} else if status.Reblog != nil {
+		inReplyToOrBoost = " \xe2\x86\xab"
+	}
 
-  if toot.IsNotification == true {
-    notification := &toot.Notification
+	idPadding :=
+		width -
+			len(fmt.Sprint(toot.ID)) -
+			runewidth.StringWidth(status.Account.DisplayName) -
+			len(account) -
+			// https://github.com/mattn/go-runewidth/issues/36
+			runewidth.StringWidth(inReplyToOrBoost)
 
-    notificationText := ""
+	if top && toot.IsNotification == true {
+		notification := &toot.Notification
 
-    notificationAccount := notification.Account.Acct
-    if notificationAccount == "" {
-      notificationAccount = notification.Account.Username
-    }
+		notificationText := ""
 
-    // https://docs.joinmastodon.org/entities/notification/#type
-    switch notification.Type {
-    case "follow":
-      notificationText = fmt.Sprintf("[red]\xe2\x98\xba\xef\xb8\x8e %s followed you[-]",
-        notificationAccount,
-      )
-    case "follow_request":
-      notificationText = fmt.Sprintf("[blue]\xe2\x98\x95 %s requested to follow you[-]",
-        notificationAccount,
-      )
-    case "mention":
-      notificationText = fmt.Sprintf("[purple]\xe2\x86\xab %s mentioned you[-]",
-        notificationAccount,
-      )
-    case "reblog":
-      notificationText = fmt.Sprintf("[green]\xe2\x86\xbb %s boosted your toot[-]",
-        notificationAccount,
-      )
-    case "favourite":
-      notificationText = fmt.Sprintf("[yellow]\xe2\x98\x85 %s faved your toot[-]",
-        notificationAccount,
-      )
-    case "poll":
-      notificationText = fmt.Sprintf("[grey]\xe2\x9c\x8e A poll by %s has ended[-]",
-        notificationAccount,
-      )
-    case "status":
-      notificationText = fmt.Sprintf("[grey]\xe2\x9c\x8c\xef\xb8\x8e %s posted a toot[-]",
-        notificationAccount,
-      )
-    }
+		notificationAccount := notification.Account.Acct
+		if notificationAccount == "" {
+			notificationAccount = notification.Account.Username
+		}
 
-    output = fmt.Sprintf("%s%s\n",
-      output,
-      notificationText,
-    )
-  }
+		// https://docs.joinmastodon.org/entities/notification/#type
+		switch notification.Type {
+		case "follow":
+			notificationText = fmt.Sprintf("[red]\xe2\x98\xba\xef\xb8\x8e %s followed you[-]",
+				notificationAccount,
+			)
+		case "follow_request":
+			notificationText = fmt.Sprintf("[blue]\xe2\x98\x95 %s requested to follow you[-]",
+				notificationAccount,
+			)
+		case "mention":
+			notificationText = fmt.Sprintf("[purple]\xe2\x86\xab %s mentioned you[-]",
+				notificationAccount,
+			)
+		case "reblog":
+			notificationText = fmt.Sprintf("[green]\xe2\x86\xbb %s boosted your toot[-]",
+				notificationAccount,
+			)
+		case "favourite":
+			notificationText = fmt.Sprintf("[yellow]\xe2\x98\x85 %s faved your toot[-]",
+				notificationAccount,
+			)
+		case "poll":
+			notificationText = fmt.Sprintf("[grey]\xe2\x9c\x8e A poll by %s has ended[-]",
+				notificationAccount,
+			)
+		case "status":
+			notificationText = fmt.Sprintf("[grey]\xe2\x9c\x8c\xef\xb8\x8e %s posted a toot[-]",
+				notificationAccount,
+			)
+		}
 
-  output = fmt.Sprintf("%s[blue]%s[-] [grey]%s[-][purple]%s[-][grey]%*d[-]\n",
-    output,
-    status.Account.DisplayName,
-    account,
-    inReplyTo,
-    idPadding,
-    toot.ID,
-  )
-  output = fmt.Sprintf("%s%s\n",
-    output,
-    html.UnescapeString(strip.StripTags(status.Content)),
-  )
+		output = fmt.Sprintf("%s%s\n",
+			output,
+			notificationText,
+		)
+	}
 
-  if showImages == true {
-    for _, attachment := range status.MediaAttachments {
-      pix, err := ansimage.NewScaledFromURL(
-        attachment.PreviewURL,
-        int((float64(width) * 0.75)),
-        width,
-        color.Transparent,
-        ansimage.ScaleModeResize,
-        ansimage.NoDithering,
-      )
-      if err == nil {
-        output = fmt.Sprintf("%s\n%s\n", output, pix.RenderExt(false, false))
-      }
-    }
-  }
+	if top {
+		output = fmt.Sprintf("%s%s[blue]%s[-] [grey]%s[-][purple]%s[-][grey]%*d[-]\n",
+			output,
+			indent,
+			status.Account.DisplayName,
+			account,
+			// strings.Repeat("X", len(status.Account.DisplayName)),
+			// strings.Repeat("x", len(account)),
+			inReplyToOrBoost,
+			idPadding,
+			toot.ID)
+	} else {
+		output = fmt.Sprintf("%s%s[blue]%s[-] [grey]%s[-][purple]%s[-]\n",
+			output,
+			indent,
+			status.Account.DisplayName,
+			account,
+			// strings.Repeat("X", len(status.Account.DisplayName)),
+			// strings.Repeat("x", len(account)),
+			inReplyToOrBoost)
+	}
 
-  output = fmt.Sprintf("%s[purple]\xe2\x86\xab %d[-] ",
-    output,
-    status.RepliesCount,
-  )
-  output = fmt.Sprintf("%s[green]\xe2\x86\xbb %d[-] ",
-    output,
-    status.ReblogsCount,
-  )
-  output = fmt.Sprintf("%s[yellow]\xe2\x98\x85 %d[-] ",
-    output,
-    status.FavouritesCount,
-  )
-  output = fmt.Sprintf("%s[grey]on %s at %s[-]\n",
-    output,
-    createdAt.Format("Jan 2"),
-    createdAt.Format("15:04"),
-  )
+	if top && status.Reblog != nil {
+		reblogOutput, err := RenderStatus(status.Reblog, toot, width, showImages, false)
+		if err == nil {
+			output = fmt.Sprintf("%s%s", output, reblogOutput)
+		}
+	} else {
+		var wrappedContent string = WrapWithIndent(html.UnescapeString(strip.StripTags(status.Content)), width-len(indent), indent)
 
-  output = fmt.Sprintf("%s\n", output)
-  return output, err
+		output = fmt.Sprintf("%s%s\n",
+			output,
+			wrappedContent) // html.UnescapeString(strip.StripTags(status.Content)),
+	}
+
+	if showImages == true {
+		for _, attachment := range status.MediaAttachments {
+			pix, err := ansimage.NewScaledFromURL(
+				attachment.PreviewURL,
+				int((float64(width) * 0.75)),
+				width,
+				color.Transparent,
+				ansimage.ScaleModeResize,
+				ansimage.NoDithering,
+			)
+			if err == nil {
+				output = fmt.Sprintf("%s\n%s\n", output, pix.RenderExt(false, false))
+			}
+		}
+	}
+
+	output = fmt.Sprintf("%s%s[purple]\xe2\x86\xab %d[-] ",
+		output,
+		indent,
+		status.RepliesCount,
+	)
+	output = fmt.Sprintf("%s[green]\xe2\x86\xbb %d[-] ",
+		output,
+		status.ReblogsCount,
+	)
+	output = fmt.Sprintf("%s[yellow]\xe2\x98\x85 %d[-] ",
+		output,
+		status.FavouritesCount,
+	)
+	output = fmt.Sprintf("%s[grey]on %s at %s[-]\n",
+		output,
+		createdAt.Format("Jan 2"),
+		createdAt.Format("15:04"),
+	)
+
+	output = fmt.Sprintf("%s\n", output)
+	return output, err
 }
