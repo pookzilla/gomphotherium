@@ -82,7 +82,7 @@ func WrapWithIndent(
 
 			characterCountOfCurrentWord = 0
 			word = ""
-		} else if committedCharacterCount+runewidth.StringWidth(word)+characterWidth > maximumWidth {
+		} else if committedCharacterCount+runewidth.StringWidth(word)+characterWidth >= maximumWidth {
 
       // giant word - we need to print part of it
 			if characterCountOfCurrentWord + characterWidth >= maximumWidth {
@@ -96,7 +96,7 @@ func WrapWithIndent(
 
 			leftoverSpace := 0
 			if justifyText {
-				leftoverSpace = int(math.Min(float64(maximumWidth-(characterCountOfCurrentWord+spaceCount)), float64(spaceCount)*1.5))
+				leftoverSpace = int(math.Min(float64(maximumWidth-(committedCharacterCount)), float64(spaceCount)*1.25))
 			}
       line := DrainLine(*wordList, spaceCount, leftoverSpace)
 			out += line
