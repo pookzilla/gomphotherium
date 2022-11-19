@@ -25,7 +25,14 @@ func RenderToot(toot *mast.Toot, width int, showImages bool, justifyText bool) (
 	return RenderStatus(status, toot, width, showImages, justifyText, false)
 }
 
-func RenderStatus(status *mastodon.Status, toot *mast.Toot, width int, showImages bool, justifyText bool, isReblog bool) (string, error) {
+func RenderStatus(
+	status *mastodon.Status,
+	toot *mast.Toot,
+	width int,
+	showImages bool,
+	justifyText bool,
+	isReblog bool,
+) (string, error) {
 	var output string = ""
 	var err error = nil
 
@@ -132,7 +139,12 @@ func RenderStatus(status *mastodon.Status, toot *mast.Toot, width int, showImage
 			output = fmt.Sprintf("%s%s", output, reblogOutput)
 		}
 	} else {
-		var wrappedContent string = WrapWithIndent(html.UnescapeString(strip.StripTags(status.Content)), width-len(indent), indent, justifyText)
+		var wrappedContent string = WrapWithIndent(
+			html.UnescapeString(strip.StripTags(status.Content)),
+			width-len(indent),
+			indent,
+			justifyText
+    )
 
 		output = fmt.Sprintf("%s%s\n",
 			output,
