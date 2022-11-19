@@ -143,8 +143,8 @@ func RenderStatus(
 			html.UnescapeString(strip.StripTags(status.Content)),
 			width-len(indent),
 			indent,
-			justifyText
-    )
+			justifyText,
+		)
 
 		output = fmt.Sprintf("%s%s\n",
 			output,
