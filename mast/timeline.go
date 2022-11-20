@@ -132,6 +132,9 @@ func (timeline *Timeline) Load() error {
 			continue
 		}
 		var notification *mastodon.Notification = nil
+		if status == nil {
+			continue
+		}
 
 		if oldestNotificationIndex >= i {
 			notification = notifications[i]
