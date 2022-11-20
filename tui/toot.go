@@ -5,7 +5,6 @@ import (
 
   // "time"
   // "context"
-  // "github.com/mattn/go-mastodon"
 
   "html"
 
@@ -16,6 +15,7 @@ import (
 
   "github.com/eliukblau/pixterm/pkg/ansimage"
 
+  // "github.com/mattn/go-mastodon"
   "github.com/mattn/go-mastodon"
   "github.com/mrusme/gomphotherium/mast"
 )
@@ -61,11 +61,11 @@ func RenderStatus(
 
   idPadding :=
     width -
-      len(fmt.Sprint(toot.ID)) -
-      runewidth.StringWidth(status.Account.DisplayName) -
-      len(account) -
-      // https://github.com/mattn/go-runewidth/issues/36
-      runewidth.StringWidth(inReplyToOrBoost)
+    len(fmt.Sprint(toot.ID)) -
+    runewidth.StringWidth(status.Account.DisplayName) -
+    len(account) -
+    // https://github.com/mattn/go-runewidth/issues/36
+    runewidth.StringWidth(inReplyToOrBoost)
 
   if !isReblog && toot.IsNotification == true {
     notification := &toot.Notification

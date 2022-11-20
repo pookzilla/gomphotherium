@@ -1,8 +1,8 @@
 package cli
 
 import (
-  "github.com/mrusme/gomphotherium/tui"
   "github.com/spf13/cobra"
+  "github.com/mrusme/gomphotherium/tui"
 )
 
 var flagAutocompletion bool
