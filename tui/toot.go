@@ -6,16 +6,13 @@ import (
   // "time"
   // "context"
 
+  "github.com/mattn/go-runewidth"
+  "github.com/grokify/html-strip-tags-go"
   "html"
 
-  strip "github.com/grokify/html-strip-tags-go"
-  "github.com/mattn/go-runewidth"
-
   "image/color"
-
   "github.com/eliukblau/pixterm/pkg/ansimage"
 
-  // "github.com/mattn/go-mastodon"
   "github.com/mattn/go-mastodon"
   "github.com/mrusme/gomphotherium/mast"
 )

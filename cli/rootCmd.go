@@ -4,8 +4,8 @@ import (
   "fmt"
   "os"
 
-  "github.com/mattn/go-mastodon"
   "github.com/spf13/cobra"
+  "github.com/mattn/go-mastodon"
 )
 
 var help string
