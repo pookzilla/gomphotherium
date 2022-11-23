@@ -10,6 +10,7 @@ COPY ./go.mod /app
 COPY ./go.sum /app
 WORKDIR /app
 RUN go mod download
+
 # Build app
 COPY Makefile /app
 COPY . /app
