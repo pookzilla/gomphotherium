@@ -118,8 +118,6 @@ func RenderStatus(
 			indent,
 			status.Account.DisplayName,
 			account,
-			// strings.Repeat("X", len(status.Account.DisplayName)),
-			// strings.Repeat("x", len(account)),
 			inReplyToOrBoost)
 	} else {
 		output = fmt.Sprintf("%s%s[blue]%s[-] [grey]%s[-][purple]%s[-][grey]%*d[-]\n",
@@ -127,8 +125,6 @@ func RenderStatus(
 			indent,
 			status.Account.DisplayName,
 			account,
-			// strings.Repeat("X", len(status.Account.DisplayName)),
-			// strings.Repeat("x", len(account)),
 			inReplyToOrBoost,
 			idPadding,
 			toot.ID)
@@ -140,7 +136,8 @@ func RenderStatus(
 			toot,
 			width,
 			showImages,
-			justifyText, true)
+			justifyText,
+			true)
 		if err == nil {
 			output = fmt.Sprintf("%s%s", output, reblogOutput)
 		}
@@ -154,7 +151,7 @@ func RenderStatus(
 
 		output = fmt.Sprintf("%s%s\n",
 			output,
-			wrappedContent) // html.UnescapeString(strip.StripTags(status.Content)),
+			wrappedContent)
 	}
 
 	if showImages == true {
