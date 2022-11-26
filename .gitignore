@@ -18,5 +18,6 @@
 /gomphotherium
 error.log
 
+# VSCode related files
 .devcontainer/*
 .vscode/*
