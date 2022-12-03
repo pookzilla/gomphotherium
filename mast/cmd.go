@@ -3,6 +3,7 @@ package mast
 import (
 	"errors"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"regexp"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
+	strip "github.com/grokify/html-strip-tags-go"
 	"github.com/mattn/go-mastodon"
 )
 
@@ -102,6 +104,7 @@ func CmdAvailable() []string {
 
 		"open",
 		"share",
+		"copy",
 
 		// "search",
 
@@ -328,6 +331,17 @@ func CmdProcessor(timeline *Timeline, input string, trigger CmdTrigger) CmdExecu
 		}
 
 		return *(&CmdExecutionResult{}).SetCodeAndError(CmdShare(timeline, tootId))
+	case "copy":
+		if trigger != TriggerTUI {
+			return CmdExecutionResult{CodeTriggerNotSupported, nil, false}
+		}
+
+		tootId, err := CmdHelperGetCopyParams(args)
+		if err != nil {
+			return CmdExecutionResult{CodeNotOk, err, false}
+		}
+
+		return *(&CmdExecutionResult{}).SetCodeAndError(CmdCopy(timeline, tootId))
 	case "?", "help":
 		if trigger != TriggerTUI {
 			return CmdExecutionResult{CodeTriggerNotSupported, nil, false}
@@ -405,6 +419,10 @@ func CmdHelperGetFavParams(args string) (int, error) {
 }
 
 func CmdHelperGetOpenParams(args string) (int, error) {
+	return CmdHelperGetTootIDFromString(args)
+}
+
+func CmdHelperGetCopyParams(args string) (int, error) {
 	return CmdHelperGetTootIDFromString(args)
 }
 
@@ -511,6 +529,22 @@ func CmdOpen(timeline *Timeline, tootID int) (CmdReturnCode, error) {
 
 	cmd.Env = append(os.Environ())
 	err := cmd.Start()
+	if err != nil {
+		return CodeNotOk, err
+	}
+
+	return CodeOk, nil
+}
+
+func CmdCopy(timeline *Timeline, tootID int) (CmdReturnCode, error) {
+	toot := timeline.Toots[tootID]
+	status := toot.Status.Content
+	if toot.Status.Reblog != nil {
+		status = toot.Status.Reblog.Content
+	}
+	text := html.UnescapeString(strip.StripTags(status))
+
+	err := clipboard.WriteAll(text)
 	if err != nil {
 		return CodeNotOk, err
 	}

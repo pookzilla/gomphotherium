@@ -182,6 +182,9 @@ Open toot in system browser
 `share`*` toot-id`* \
 Copy toot URL to the clipboard
 
+`copy`*` toot-id`* \
+Copy toot text to the clipboard
+
 `help` \
 `?` \
 Show help page
