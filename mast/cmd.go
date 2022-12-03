@@ -105,6 +105,7 @@ func CmdAvailable() []string {
 
 		// "search",
 
+		"thread",
 		"history",
 
 		"help",
@@ -179,6 +180,21 @@ func CmdProcessor(timeline *Timeline, input string, trigger CmdTrigger) CmdExecu
 		}
 
 		timeline.Switch(TimelineHashtag, &timelineOptions)
+		return CmdExecutionResult{CodeOk, nil, true}
+	case "thread":
+		tootID, err := CmdHelperGetThreadParams(args)
+		if err != nil {
+			return CmdExecutionResult{CodeNotOk, err, false}
+		}
+
+		status := timeline.Toots[tootID].Status
+		if status.Reblog != nil {
+			status = *status.Reblog
+		}
+		timelineOptions := TimelineOptions{
+			ThreadToot: status,
+		}
+		timeline.Switch(TimelineThread, &timelineOptions)
 		return CmdExecutionResult{CodeOk, nil, true}
 	case "whois":
 		if trigger != TriggerTUI {
@@ -394,6 +410,21 @@ func CmdHelperGetReplyParams(args string) (int, string, error) {
 	newArgs := splitArgs[1]
 
 	return tootId, newArgs, nil
+}
+
+func CmdHelperGetThreadParams(args string) (int, error) {
+	splitArgs := strings.SplitN(args, " ", 1)
+
+	if len(splitArgs) < 1 {
+		return -1, errors.New("Toot ID missing!")
+	}
+
+	tootId, err := CmdHelperGetTootIDFromString(splitArgs[0])
+	if err != nil {
+		return tootId, err
+	}
+
+	return tootId, nil
 }
 
 func CmdHelperGetBoostParams(args string) (int, error) {

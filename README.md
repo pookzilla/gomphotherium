@@ -128,6 +128,9 @@ Switch between timelines
 `whois`*` user`* \
 Switch to user profile and timeline
 
+`thread`*` toot-id`*
+Switch to thread ending with toot
+
 `t`*` content ...`* \
 `toot`*` content ...`* \
 Publish a new public toot

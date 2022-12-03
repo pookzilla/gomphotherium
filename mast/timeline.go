@@ -16,18 +16,21 @@ const (
 	TimelineNotifications              = 3
 	TimelineHashtag                    = 4
 	TimelineUser                       = 5
+	TimelineThread                     = 6
 )
 
 type TimelineOptions struct {
 	IsLocal bool
 	Hashtag string
 	User    mastodon.Account
+	ThreadToot	mastodon.Status
 }
 
 type Timeline struct {
 	client          *mastodon.Client
 	timelineType    TimelineType
 	timelineOptions TimelineOptions
+	Focus						int
 
 	LastRenderedIndex int
 
@@ -53,7 +56,8 @@ func NewTimeline(mastodonClient *mastodon.Client) Timeline {
 func (timeline *Timeline) Switch(timelineType TimelineType, options *TimelineOptions) {
 	if timeline.timelineType != timelineType ||
 		timelineType == TimelineHashtag ||
-		timelineType == TimelineUser {
+		timelineType == TimelineUser ||
+		timelineType == TimelineThread {
 		timeline.timelineType = timelineType
 		if options != nil {
 			timeline.timelineOptions = *options
@@ -76,6 +80,8 @@ func (timeline *Timeline) Load() error {
 	var statuses []*mastodon.Status
 	var notifications []*mastodon.Notification
 	var err error
+
+	timeline.Focus = 0
 
 	account, err := timeline.client.GetAccountCurrentUser(context.Background())
 	if err != nil {
@@ -119,11 +125,38 @@ func (timeline *Timeline) Load() error {
 				timeline.timelineOptions.User.ID,
 				nil,
 			)
+	case TimelineThread:
+		context, err := timeline.client.GetStatusContext(
+			context.Background(),
+			timeline.timelineOptions.ThreadToot.ID,
+		)
+
+		if err != nil {
+			statuses = make([]*mastodon.Status, 1);
+			statuses = append(statuses, &timeline.timelineOptions.ThreadToot);
+			timeline.Focus = 0
+		} else {
+			statuses = make([]*mastodon.Status, len(context.Ancestors) + len(context.Descendants) + 1)
+			statuses = context.Ancestors
+			statuses = append(statuses, &timeline.timelineOptions.ThreadToot)
+			timeline.Focus = len(context.Ancestors)
+			statuses = append(statuses, context.Descendants...)
+		}
+
+		// reverse
+		for i, j := 0, len(statuses)-1; i < j; i, j = i+1, j-1 {
+			if j == timeline.Focus {
+				timeline.Focus = i
+			}
+			statuses[i], statuses[j] = statuses[j], statuses[i];
+		}
 	}
 
 	if err != nil {
 		return err
 	}
+
+	this is all fucked up for threads.  needs to do it different
 
 	oldestStatusIndex := len(statuses) - 1
 	oldestNotificationIndex := len(notifications) - 1

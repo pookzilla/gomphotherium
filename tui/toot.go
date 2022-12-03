@@ -21,9 +21,10 @@ func RenderToot(
 	toot *mast.Toot,
 	width int,
 	showImages bool,
-	justifyText bool) (string, error) {
+	justifyText bool,
+	focused bool) (string, error) {
 	status := &toot.Status
-	return RenderStatus(status, toot, width, showImages, justifyText, false)
+	return RenderStatus(status, toot, width, showImages, justifyText, false, focused)
 }
 
 func RenderStatus(
@@ -33,6 +34,7 @@ func RenderStatus(
 	showImages bool,
 	justifyText bool,
 	isReblog bool,
+	focused bool,
 ) (string, error) {
 	var output string = ""
 	var err error = nil
@@ -40,6 +42,8 @@ func RenderStatus(
 	var indent string = ""
 	if isReblog {
 		indent = "    "
+	} else if focused {
+		indent = "  ► "
 	}
 
 	createdAt := status.CreatedAt
@@ -137,7 +141,8 @@ func RenderStatus(
 			width,
 			showImages,
 			justifyText,
-			true)
+			true,
+			focused)
 		if err == nil {
 			output = fmt.Sprintf("%s%s", output, reblogOutput)
 		}

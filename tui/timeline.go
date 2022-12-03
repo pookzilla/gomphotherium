@@ -17,7 +17,11 @@ func RenderTimeline(
 	var tootOutput string = ""
 	newRenderedIndex := len(timeline.Toots)
 	for i := (timeline.LastRenderedIndex + 1); i < newRenderedIndex; i++ {
-		tootOutput, err = RenderToot(&timeline.Toots[i], width, showImages, justifyText)
+		tootWidth := width
+		if i == timeline.Focus {
+			tootWidth -= 4
+		}
+		tootOutput, err = RenderToot(&timeline.Toots[i], tootWidth, showImages, justifyText, i == timeline.Focus)
 		output = fmt.Sprintf("%s%s\n", output, tootOutput)
 	}
 
