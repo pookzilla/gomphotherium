@@ -43,7 +43,7 @@ func RenderStatus(
 	if isReblog {
 		indent = "    "
 	} else if focused {
-		indent = "  ► "
+		indent = "  [purple]►[-] "
 	}
 
 	createdAt := status.CreatedAt
