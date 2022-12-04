@@ -20,17 +20,16 @@ const (
 )
 
 type TimelineOptions struct {
-	IsLocal bool
-	Hashtag string
-	User    mastodon.Account
-	ThreadToot	mastodon.Status
+	IsLocal    bool
+	Hashtag    string
+	User       mastodon.Account
+	ThreadToot mastodon.Status
 }
 
 type Timeline struct {
 	client          *mastodon.Client
 	timelineType    TimelineType
 	timelineOptions TimelineOptions
-	Focus						int
 
 	LastRenderedIndex int
 
@@ -38,6 +37,7 @@ type Timeline struct {
 	Toots                     []Toot
 	TootIndexStatusIDMappings map[string]int
 	KnownUsers                map[string]string
+	Focus                     *Toot
 }
 
 func NewTimeline(mastodonClient *mastodon.Client) Timeline {
@@ -80,8 +80,9 @@ func (timeline *Timeline) Load() error {
 	var statuses []*mastodon.Status
 	var notifications []*mastodon.Notification
 	var err error
+	var focusStatus *mastodon.Status
 
-	timeline.Focus = 0
+	timeline.Focus = nil
 
 	account, err := timeline.client.GetAccountCurrentUser(context.Background())
 	if err != nil {
@@ -131,32 +132,26 @@ func (timeline *Timeline) Load() error {
 			timeline.timelineOptions.ThreadToot.ID,
 		)
 
+		focusStatus = &timeline.timelineOptions.ThreadToot
 		if err != nil {
-			statuses = make([]*mastodon.Status, 1);
-			statuses = append(statuses, &timeline.timelineOptions.ThreadToot);
-			timeline.Focus = 0
+			statuses = make([]*mastodon.Status, 1)
+			statuses = append(statuses, &timeline.timelineOptions.ThreadToot)
 		} else {
-			statuses = make([]*mastodon.Status, len(context.Ancestors) + len(context.Descendants) + 1)
+			statuses = make([]*mastodon.Status, len(context.Ancestors)+len(context.Descendants)+1)
 			statuses = context.Ancestors
 			statuses = append(statuses, &timeline.timelineOptions.ThreadToot)
-			timeline.Focus = len(context.Ancestors)
 			statuses = append(statuses, context.Descendants...)
 		}
 
 		// reverse
 		for i, j := 0, len(statuses)-1; i < j; i, j = i+1, j-1 {
-			if j == timeline.Focus {
-				timeline.Focus = i
-			}
-			statuses[i], statuses[j] = statuses[j], statuses[i];
+			statuses[i], statuses[j] = statuses[j], statuses[i]
 		}
 	}
 
 	if err != nil {
 		return err
 	}
-
-	this is all fucked up for threads.  needs to do it different
 
 	oldestStatusIndex := len(statuses) - 1
 	oldestNotificationIndex := len(notifications) - 1
@@ -172,14 +167,23 @@ func (timeline *Timeline) Load() error {
 		}
 
 		statusID := string(status.ID)
-		_, exists := timeline.TootIndexStatusIDMappings[statusID]
+		tootIndex, exists := timeline.TootIndexStatusIDMappings[statusID]
 		if exists == false {
 			tootIndex := len(timeline.Toots)
+			toot := NewToot(timeline.client, status, notification, tootIndex)
+			if focusStatus != nil && focusStatus.ID == toot.Status.ID {
+				timeline.Focus = &toot
+			}
 			timeline.Toots =
-				append(timeline.Toots, NewToot(timeline.client, status, notification, tootIndex))
+				append(timeline.Toots, toot)
 
 			timeline.TootIndexStatusIDMappings[statusID] = tootIndex
 			timeline.KnownUsers[string(status.Account.ID)] = status.Account.Acct
+		} else if focusStatus != nil {
+			toot := timeline.Toots[tootIndex]
+			if focusStatus.ID == toot.Status.ID {
+				timeline.Focus = &toot
+			}
 		}
 	}
 

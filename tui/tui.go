@@ -264,7 +264,8 @@ func (tuiCore *TUICore) UpdateTimeline(scrollToEnd bool) bool {
 	currentTimelineType := tuiCore.Timeline.GetCurrentType()
 	if tuiCore.RenderedTimelineType != currentTimelineType ||
 		currentTimelineType == mast.TimelineHashtag ||
-		currentTimelineType == mast.TimelineUser {
+		currentTimelineType == mast.TimelineUser ||
+		currentTimelineType == mast.TimelineThread {
 		tuiCore.Stream.Clear()
 		tuiCore.RenderedTimelineType = currentTimelineType
 		tuiCore.Timeline.LastRenderedIndex = -1
