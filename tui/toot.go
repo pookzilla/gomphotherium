@@ -9,7 +9,9 @@ import (
 	// "context"
 
 	"fmt"
+	"math/rand"
 	"strings"
+	"unicode"
 
 	// "time"
 	// "context"
@@ -25,6 +27,9 @@ import (
 	"github.com/mattn/go-mastodon"
 	"github.com/mrusme/gomphotherium/mast"
 )
+
+var sanitize bool = false
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func RenderToot(
 	toot *mast.Toot,
@@ -81,9 +86,9 @@ func RenderStatus(
 
 	createdAt := status.CreatedAt
 
-	account := status.Account.Acct
+	account := sanitizeText(status.Account.Acct)
 	if account == "" {
-		account = status.Account.Username
+		account = sanitizeText(status.Account.Username)
 	}
 
 	inReplyToOrBoost := ""
@@ -98,9 +103,9 @@ func RenderStatus(
 
 		notificationText := ""
 
-		notificationAccount := notification.Account.Acct
+		notificationAccount := sanitizeText(notification.Account.Acct)
 		if notificationAccount == "" {
-			notificationAccount = notification.Account.Username
+			notificationAccount = sanitizeText(notification.Account.Username)
 		}
 
 		// https://docs.joinmastodon.org/entities/notification/#type
@@ -136,13 +141,13 @@ func RenderStatus(
 		}
 
 		output = append(output,
-			notificationText,
+			sanitizeText(notificationText),
 		)
 	}
 
 	output = append(output, fmt.Sprintf("[blue]%s[-] [grey]%s[-][purple]%s[-]",
-		status.Account.DisplayName,
-		account,
+		sanitizeText(status.Account.DisplayName),
+		sanitizeText(account),
 		inReplyToOrBoost))
 
 	if !isReblog && status.Reblog != nil {
@@ -162,7 +167,7 @@ func RenderStatus(
 		}
 	} else {
 		lines := WrapWithIndent(
-			html.UnescapeString(strip.StripTags(status.Content)),
+			html.UnescapeString(strip.StripTags(sanitizeText(status.Content))),
 			width,
 			justifyText,
 		)
@@ -232,4 +237,20 @@ func LoadImage(imageCache *Images, width int, toot *mast.Toot) *[]string {
 	})
 
 	return image
+}
+
+func sanitizeText(input string) string {
+	if sanitize {
+		runes := []rune(input)
+		for i := 0; i < len(runes); i++ {
+			r := runes[i]
+			if unicode.IsLetter(r) || unicode.IsDigit(r) {
+				runes[i] = letterRunes[rand.Intn(len(letterRunes))]
+			}
+		}
+
+		return string(runes)
+	} else {
+		return input
+	}
 }
