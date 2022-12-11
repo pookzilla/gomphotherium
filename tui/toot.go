@@ -28,7 +28,7 @@ import (
 	"github.com/mrusme/gomphotherium/mast"
 )
 
-var sanitize bool = false
+var anonymize bool = false
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func RenderToot(
@@ -86,9 +86,9 @@ func RenderStatus(
 
 	createdAt := status.CreatedAt
 
-	account := sanitizeText(status.Account.Acct)
+	account := anonymizeTextIfRequired(status.Account.Acct)
 	if account == "" {
-		account = sanitizeText(status.Account.Username)
+		account = anonymizeTextIfRequired(status.Account.Username)
 	}
 
 	inReplyToOrBoost := ""
@@ -103,9 +103,9 @@ func RenderStatus(
 
 		notificationText := ""
 
-		notificationAccount := sanitizeText(notification.Account.Acct)
+		notificationAccount := anonymizeTextIfRequired(notification.Account.Acct)
 		if notificationAccount == "" {
-			notificationAccount = sanitizeText(notification.Account.Username)
+			notificationAccount = anonymizeTextIfRequired(notification.Account.Username)
 		}
 
 		// https://docs.joinmastodon.org/entities/notification/#type
@@ -141,13 +141,13 @@ func RenderStatus(
 		}
 
 		output = append(output,
-			sanitizeText(notificationText),
+			anonymizeTextIfRequired(notificationText),
 		)
 	}
 
 	output = append(output, fmt.Sprintf("[blue]%s[-] [grey]%s[-][purple]%s[-]",
-		sanitizeText(status.Account.DisplayName),
-		sanitizeText(account),
+		anonymizeTextIfRequired(status.Account.DisplayName),
+		anonymizeTextIfRequired(account),
 		inReplyToOrBoost))
 
 	if !isReblog && status.Reblog != nil {
@@ -167,7 +167,7 @@ func RenderStatus(
 		}
 	} else {
 		lines := WrapWithIndent(
-			html.UnescapeString(strip.StripTags(sanitizeText(status.Content))),
+			html.UnescapeString(strip.StripTags(anonymizeTextIfRequired(status.Content))),
 			width,
 			justifyText,
 		)
@@ -239,8 +239,8 @@ func LoadImage(imageCache *Images, width int, toot *mast.Toot) *[]string {
 	return image
 }
 
-func sanitizeText(input string) string {
-	if sanitize {
+func anonymizeTextIfRequired(input string) string {
+	if anonymize {
 		runes := []rune(input)
 		for i := 0; i < len(runes); i++ {
 			r := runes[i]
